@@ -69,7 +69,12 @@ def open_image_folder(source_dir, *, max_images: Optional[int]):
         for idx, fname in enumerate(input_images):
             arch_fname = os.path.relpath(fname, source_dir)
             arch_fname = arch_fname.replace('\\', '/')
-            img = np.array(PIL.Image.open(fname))
+
+            try:
+                img = np.array(PIL.Image.open(fname))
+            except PIL.UnidentifiedImageError:
+                continue
+
             yield dict(img=img, label=labels.get(arch_fname))
             if idx >= max_idx-1:
                 break
@@ -386,6 +391,10 @@ def convert_dataset(
         # Error check to require uniform image attributes across
         # the whole dataset.
         channels = img.shape[2] if img.ndim == 3 else 1
+
+        if channels != 3:
+            continue
+
         cur_image_attrs = {
             'width': img.shape[1],
             'height': img.shape[0],
@@ -410,8 +419,7 @@ def convert_dataset(
         image_bits = io.BytesIO()
         img.save(image_bits, format='png', compress_level=0, optimize=False)
         save_bytes(os.path.join(archive_root_dir, archive_fname), image_bits.getbuffer())
-        labels.append([archive_fname, image['label']] if image['label'] is not None else None)
-
+        labels.append([archive_fname, image['label']] if image['label'] is not None else [archive_fname, 0])
     metadata = {
         'labels': labels if all(x is not None for x in labels) else None
     }
